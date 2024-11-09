@@ -2,12 +2,10 @@ package org.os;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.io.*;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
-class ParkingLot {
+class ParkingLot
+{
     private final Semaphore spots;
     private final AtomicInteger totalServedCars = new AtomicInteger(0);
     private final Map<String, AtomicInteger> gateServedCars = new HashMap<>();
@@ -15,7 +13,7 @@ class ParkingLot {
 
     public ParkingLot(int totalSpots)
     {
-        this.spots = new Semaphore(totalSpots);
+        this.spots = new Semaphore(totalSpots, true); // Fair semaphore
         this.totalSpots = totalSpots;
     }
 
@@ -32,35 +30,52 @@ class ParkingLot {
     public void parkCar(int carId, String gateName, int arrivalTime, int duration)
     {
         long waitStartTime = System.currentTimeMillis();
-        logStatus("Car " + carId + " from " + gateName + " arrived at time " + arrivalTime);
+
+        synchronized (this)
+        {
+            logStatus("Car " + carId + " from " + gateName + " arrived at time " + arrivalTime);
+            if (getAvailableSpots() == 0)
+            {
+                logStatus("Car " + carId + " from " + gateName + " waiting for a spot.");
+            }
+        }
 
         try {
             if (spots.tryAcquire())
             {
-                long waitTime = (System.currentTimeMillis() - waitStartTime) / 1000;
-                logStatus("Car " + carId + " from " + gateName + " parked. (Parking Status: "
-                        + (totalSpots - getAvailableSpots()) + " spots occupied)");
+                synchronized (this)
+                {
+                    logStatus("Car " + carId + " from " + gateName + " parked. (Parking Status: "
+                            + (totalSpots - getAvailableSpots()) + " spots occupied)");
+                }
                 Thread.sleep(duration * 1000); // simulate parking duration
                 spots.release();
-                logStatus("Car " + carId + " from " + gateName + " left after " + duration
-                        + " units of time. (Parking Status: " + (totalSpots - getAvailableSpots())
-                        + " spots occupied)");
+                synchronized (this) {
+                    logStatus("Car " + carId + " from " + gateName + " left after " + duration
+                            + " units of time. (Parking Status: " + (totalSpots - getAvailableSpots())
+                            + " spots occupied)");
+                }
             }
-            else {
-                logStatus("Car " + carId + " from " + gateName + " waiting for a spot.");
+            else
+            {
                 spots.acquire(); // waits for a parking spot to become available
                 long waitTime = (System.currentTimeMillis() - waitStartTime) / 1000;
-                logStatus("Car " + carId + " from " + gateName + " parked after waiting for "
-                        + waitTime + " units of time. (Parking Status: "
-                        + (totalSpots - getAvailableSpots()) + " spots occupied)");
+                synchronized (this)
+                {
+                    logStatus("Car " + carId + " from " + gateName + " parked after waiting for "
+                            + waitTime + " units of time. (Parking Status: "
+                            + (totalSpots - getAvailableSpots()) + " spots occupied)");
+                }
                 Thread.sleep(duration * 1000); // simulate parking duration
                 spots.release();
-                logStatus("Car " + carId + " from " + gateName + " left after " + duration
-                        + " units of time. (Parking Status: " + (totalSpots - getAvailableSpots())
-                        + " spots occupied)");
+                synchronized (this) {
+                    logStatus("Car " + carId + " from " + gateName + " left after " + duration
+                            + " units of time. (Parking Status: " + (totalSpots - getAvailableSpots())
+                            + " spots occupied)");
+                }
             }
-        }
-        catch (InterruptedException e) {
+        } catch (InterruptedException e)
+        {
             logStatus("Car " + carId + " from " + gateName + " was interrupted.");
         }
 
@@ -69,7 +84,8 @@ class ParkingLot {
         gateServedCars.computeIfAbsent(gateName, k -> new AtomicInteger(0)).incrementAndGet();
     }
 
-    public int getTotalServedCars() {
+    public int getTotalServedCars()
+    {
         return totalServedCars.get();
     }
 
@@ -91,12 +107,19 @@ class Car implements Runnable
     private final int parkingDuration;
     private final ParkingLot parkingLot;
 
-    public Car(int carId, String gateName, int arrivalTime, int parkingDuration, ParkingLot parkingLot) {
+    public Car(int carId, String gateName, int arrivalTime, int parkingDuration, ParkingLot parkingLot)
+    {
         this.carId = carId;
         this.gateName = gateName;
         this.arrivalTime = arrivalTime;
         this.parkingDuration = parkingDuration;
         this.parkingLot = parkingLot;
+    }
+
+    // Getter methods for private fields
+    public int getArrivalTime()
+    {
+        return arrivalTime;
     }
 
     @Override
@@ -113,52 +136,62 @@ class Car implements Runnable
 
 public class ParkingSimulation
 {
-    public static void main(String[] args)
-    {
+    public static void main(String[] args) {
         ParkingLot parkingLot = new ParkingLot(4); // 4 parking spots
         List<Thread> gates = new ArrayList<>();
+
+        // Priority queue to sort cars by arrival time
+        PriorityQueue<Car> carQueue = new PriorityQueue<>(Comparator.comparingInt(Car::getArrivalTime));
 
         // Read from file.txt
         try (BufferedReader br = new BufferedReader(new FileReader("file.txt"))) {
             String line;
             while ((line = br.readLine()) != null) {
-                // Split the line based on commas and spaces
                 String[] parts = line.split(",\\s*");
                 String gateName = parts[0];
                 int carId = Integer.parseInt(parts[1].split(" ")[1]);
                 int arrivalTime = Integer.parseInt(parts[2].split(" ")[1]);
                 int parkingDuration = Integer.parseInt(parts[3].split(" ")[1]);
 
-                // Create a car thread
-                Thread carThread = new Thread(new Car(carId, gateName, arrivalTime, parkingDuration, parkingLot));
-                gates.add(carThread);
+                Car car = new Car(carId, gateName, arrivalTime, parkingDuration, parkingLot);
+                carQueue.add(car);
             }
-        } catch (IOException e) {
+        } catch (IOException e)
+        {
             System.err.println("Error reading the file: " + e.getMessage());
         }
 
-        // Start all car threads
-        for (Thread gate : gates) {
-            gate.start();
+        // Start cars based on arrival time
+        while (!carQueue.isEmpty())
+        {
+            Car car = carQueue.poll();
+            Thread carThread = new Thread(car);
+            gates.add(carThread);
+            carThread.start();
         }
 
         // Wait for all threads to finish
-        for (Thread gate : gates) {
-            try {
+        for (Thread gate : gates)
+        {
+            try
+            {
                 gate.join();
-            } catch (InterruptedException e) {
+            }
+            catch (InterruptedException e)
+            {
                 e.printStackTrace();
             }
         }
+
         System.out.println("...");
         System.out.println("Total Cars Served: " + parkingLot.getTotalServedCars());
         System.out.println("Current Cars in Parking: " + (4 - parkingLot.getAvailableSpots()));
 
-        // Print detailed gate statistics
         System.out.println("Details:");
         Map<String, Integer> gateStats = parkingLot.getGateStatistics();
-        for (Map.Entry<String, Integer> entry : gateStats.entrySet()) {
-            System.out.println("-" + entry.getKey() + " served " + entry.getValue() + " cars.");
+        for (Map.Entry<String, Integer> entry : gateStats.entrySet())
+        {
+            System.out.println("- " + entry.getKey() + " served " + entry.getValue() + " cars.");
         }
     }
 }
