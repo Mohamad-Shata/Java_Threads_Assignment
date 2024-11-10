@@ -4,17 +4,17 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.io.*;
 import java.util.*;
 
-class ParkingLot
+class Parking_Lot
 {
     private final Semaphore spots;
-    private final AtomicInteger totalServedCars = new AtomicInteger(0);
+    private final AtomicInteger total_served_cars = new AtomicInteger(0);
     private final Map<String, AtomicInteger> gateServedCars = new HashMap<>();
-    private final int totalSpots;
+    private final int total_spots;
 
-    public ParkingLot(int totalSpots)
+    public Parking_Lot(int totalSpots)
     {
         this.spots = new Semaphore(totalSpots, true); // Fair semaphore
-        this.totalSpots = totalSpots;
+        this.total_spots = totalSpots;
     }
 
     public synchronized int getAvailableSpots()
@@ -30,7 +30,6 @@ class ParkingLot
     public void parkCar(int carId, String gateName, int arrivalTime, int duration)
     {
         long waitStartTime = System.currentTimeMillis();
-
         synchronized (this)
         {
             logStatus("Car " + carId + " from " + gateName + " arrived at time " + arrivalTime);
@@ -40,20 +39,19 @@ class ParkingLot
             }
         }
 
-        try {
+        try
+        {
             if (spots.tryAcquire())
             {
                 synchronized (this)
                 {
-                    logStatus("Car " + carId + " from " + gateName + " parked. (Parking Status: "
-                            + (totalSpots - getAvailableSpots()) + " spots occupied)");
+                    logStatus("Car " + carId + " from " + gateName + " parked. (Parking Status: " + (total_spots - getAvailableSpots()) + " spots occupied)");
                 }
                 Thread.sleep(duration * 1000); // simulate parking duration
                 spots.release();
-                synchronized (this) {
-                    logStatus("Car " + carId + " from " + gateName + " left after " + duration
-                            + " units of time. (Parking Status: " + (totalSpots - getAvailableSpots())
-                            + " spots occupied)");
+                synchronized (this)
+                {
+                    logStatus("Car " + carId + " from " + gateName + " left after " + duration + " units of time. (Parking Status: " + (total_spots - getAvailableSpots()) + " spots occupied)");
                 }
             }
             else
@@ -62,37 +60,36 @@ class ParkingLot
                 long waitTime = (System.currentTimeMillis() - waitStartTime) / 1000;
                 synchronized (this)
                 {
-                    logStatus("Car " + carId + " from " + gateName + " parked after waiting for "
-                            + waitTime + " units of time. (Parking Status: "
-                            + (totalSpots - getAvailableSpots()) + " spots occupied)");
+                    logStatus("Car " + carId + " from " + gateName + " parked after waiting for " + waitTime + " units of time. (Parking Status: " + (total_spots - getAvailableSpots()) + " spots occupied)");
                 }
                 Thread.sleep(duration * 1000); // simulate parking duration
                 spots.release();
-                synchronized (this) {
-                    logStatus("Car " + carId + " from " + gateName + " left after " + duration
-                            + " units of time. (Parking Status: " + (totalSpots - getAvailableSpots())
-                            + " spots occupied)");
+                synchronized (this)
+                {
+                    logStatus("Car " + carId + " from " + gateName + " left after " + duration + " units of time. (Parking Status: " + (total_spots - getAvailableSpots())  + " spots occupied)");
                 }
             }
-        } catch (InterruptedException e)
+        }
+        catch (InterruptedException e)
         {
             logStatus("Car " + carId + " from " + gateName + " was interrupted.");
         }
 
         // Update statistics
-        totalServedCars.incrementAndGet();
+        total_served_cars.incrementAndGet();
         gateServedCars.computeIfAbsent(gateName, k -> new AtomicInteger(0)).incrementAndGet();
     }
 
     public int getTotalServedCars()
     {
-        return totalServedCars.get();
+        return total_served_cars.get();
     }
 
     public Map<String, Integer> getGateStatistics()
     {
         Map<String, Integer> stats = new HashMap<>();
-        for (Map.Entry<String, AtomicInteger> entry : gateServedCars.entrySet()) {
+        for (Map.Entry<String, AtomicInteger> entry : gateServedCars.entrySet())
+        {
             stats.put(entry.getKey(), entry.getValue().get());
         }
         return stats;
@@ -105,9 +102,9 @@ class Car implements Runnable
     private final String gateName;
     private final int arrivalTime;
     private final int parkingDuration;
-    private final ParkingLot parkingLot;
+    private final Parking_Lot parkingLot;
 
-    public Car(int carId, String gateName, int arrivalTime, int parkingDuration, ParkingLot parkingLot)
+    public Car(int carId, String gateName, int arrivalTime, int parkingDuration, Parking_Lot parkingLot)
     {
         this.carId = carId;
         this.gateName = gateName;
@@ -125,10 +122,12 @@ class Car implements Runnable
     @Override
     public void run()
     {
-        try {
+        try
+        {
             Thread.sleep(arrivalTime * 1000); // simulate arrival time
             parkingLot.parkCar(carId, gateName, arrivalTime, parkingDuration);
-        } catch (InterruptedException e) {
+        }
+        catch (InterruptedException e) {
             System.out.println("Car " + carId + " was interrupted during arrival.");
         }
     }
@@ -136,17 +135,20 @@ class Car implements Runnable
 
 public class ParkingSimulation
 {
-    public static void main(String[] args) {
-        ParkingLot parkingLot = new ParkingLot(4); // 4 parking spots
+    public static void main(String[] args)
+    {
+        Parking_Lot parkingLot = new Parking_Lot(4); // 4 parking spots
         List<Thread> gates = new ArrayList<>();
 
         // Priority queue to sort cars by arrival time
         PriorityQueue<Car> carQueue = new PriorityQueue<>(Comparator.comparingInt(Car::getArrivalTime));
 
         // Read from file.txt
-        try (BufferedReader br = new BufferedReader(new FileReader("file.txt"))) {
+        try (BufferedReader br = new BufferedReader(new FileReader("file.txt")))
+        {
             String line;
-            while ((line = br.readLine()) != null) {
+            while ((line = br.readLine()) != null)
+            {
                 String[] parts = line.split(",\\s*");
                 String gateName = parts[0];
                 int carId = Integer.parseInt(parts[1].split(" ")[1]);
@@ -156,7 +158,8 @@ public class ParkingSimulation
                 Car car = new Car(carId, gateName, arrivalTime, parkingDuration, parkingLot);
                 carQueue.add(car);
             }
-        } catch (IOException e)
+        }
+        catch (IOException e)
         {
             System.err.println("Error reading the file: " + e.getMessage());
         }
@@ -186,7 +189,6 @@ public class ParkingSimulation
         System.out.println("...");
         System.out.println("Total Cars Served: " + parkingLot.getTotalServedCars());
         System.out.println("Current Cars in Parking: " + (4 - parkingLot.getAvailableSpots()));
-
         System.out.println("Details:");
         Map<String, Integer> gateStats = parkingLot.getGateStatistics();
         for (Map.Entry<String, Integer> entry : gateStats.entrySet())
