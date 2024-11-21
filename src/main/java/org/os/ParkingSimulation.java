@@ -47,7 +47,7 @@ class Parking_Lot
                 {
                     logStatus("Car " + carId + " from " + gateName + " parked. (Parking Status: " + (total_spots - getAvailableSpots()) + " spots occupied)");
                 }
-                Thread.sleep(duration * 1000); // simulate parking duration
+                Thread.sleep(duration * 1000);
                 spots.release();
                 synchronized (this)
                 {
@@ -56,13 +56,13 @@ class Parking_Lot
             }
             else
             {
-                spots.acquire(); // waits for a parking spot to become available
-                long waitTime = (System.currentTimeMillis() - waitStartTime) / 1000;
+                spots.acquire();
+                long waitTime = (long) Math.ceil((System.currentTimeMillis() - waitStartTime) / 1000.0);
                 synchronized (this)
                 {
                     logStatus("Car " + carId + " from " + gateName + " parked after waiting for " + waitTime + " units of time. (Parking Status: " + (total_spots - getAvailableSpots()) + " spots occupied)");
                 }
-                Thread.sleep(duration * 1000); // simulate parking duration
+                Thread.sleep(duration * 1000);
                 spots.release();
                 synchronized (this)
                 {
@@ -75,7 +75,6 @@ class Parking_Lot
             logStatus("Car " + carId + " from " + gateName + " was interrupted.");
         }
 
-        // Update statistics
         total_served_cars.incrementAndGet();
         gateServedCars.computeIfAbsent(gateName, k -> new AtomicInteger(0)).incrementAndGet();
     }
@@ -113,7 +112,6 @@ class Car implements Runnable
         this.parkingLot = parkingLot;
     }
 
-    // Getter methods for private fields
     public int getArrivalTime()
     {
         return arrivalTime;
@@ -140,10 +138,8 @@ public class ParkingSimulation
         Parking_Lot parkingLot = new Parking_Lot(4); // 4 parking spots
         List<Thread> gates = new ArrayList<>();
 
-        // Priority queue to sort cars by arrival time
         PriorityQueue<Car> carQueue = new PriorityQueue<>(Comparator.comparingInt(Car::getArrivalTime));
 
-        // Read from file.txt
         try (BufferedReader br = new BufferedReader(new FileReader("file.txt")))
         {
             String line;
@@ -164,7 +160,6 @@ public class ParkingSimulation
             System.err.println("Error reading the file: " + e.getMessage());
         }
 
-        // Start cars based on arrival time
         while (!carQueue.isEmpty())
         {
             Car car = carQueue.poll();
@@ -173,7 +168,6 @@ public class ParkingSimulation
             carThread.start();
         }
 
-        // Wait for all threads to finish
         for (Thread gate : gates)
         {
             try
